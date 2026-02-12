@@ -3,44 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phuket Provincial Land Office GECC Tracker (Final)</title>
+    <title>Phuket Provincial Land Office GECC Tracker (Secure)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
     
     <style>
-        body { background-color: #f8f9fa; font-family: 'Sarabun', sans-serif; }
-        .card-dashboard { border: none; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .table-hover tbody tr:hover { background-color: #f1f3f5; }
-        .status-badge { min-width: 90px; }
+        body { background-color: #f0f2f5; font-family: 'Sarabun', sans-serif; }
+        .card-dashboard { border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: all 0.3s; }
+        .card-dashboard:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        .status-badge { min-width: 130px; transition: all 0.2s; }
         .nav-link { cursor: pointer; font-weight: 600; color: #6c757d; }
         .nav-link.active { color: #0d6efd !important; border-bottom: 3px solid #0d6efd; background: none; }
+        .loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; }
+        .text-wrap-full { white-space: normal !important; word-wrap: break-word; line-height: 1.6; }
+        /* ซ่อนปุ่ม Login ถ้าล็อกอินแล้ว */
+        .logged-in #login-btn { display: none; }
+        .logged-out #logout-btn { display: none; }
     </style>
 </head>
-<body>
+<body class="logged-out">
+
+<div id="loading" class="loading-overlay">
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-primary fw-bold">กำลังเชื่อมต่อฐานข้อมูล...</p>
+    </div>
+</div>
 
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="text-primary fw-bold"><i class="fas fa-clipboard-check"></i> Phuket Provincial Land Office GECC 2569 Tracker</h2>
-        <button class="btn btn-success" onclick="alert('บันทึกข้อมูลเรียบร้อย (จำลอง)')"><i class="fas fa-save"></i> บันทึกผล</button>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="text-primary fw-bold mb-0"><i class="fas fa-cloud"></i> Phuket Land GECC Tracker</h2>
+            <small class="text-muted">ระบบติดตามความคืบหน้า (Real-time)</small>
+        </div>
+        <div class="d-flex align-items-center">
+            <span id="save-status" class="text-success me-3 small fw-bold"><i class="fas fa-check-circle"></i> ล่าสุด</span>
+            
+            <button id="login-btn" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#loginModal">
+                <i class="fas fa-lock"></i> เข้าสู่ระบบ (Admin)
+            </button>
+            <button id="logout-btn" class="btn btn-outline-danger btn-sm" onclick="window.doLogout()">
+                <i class="fas fa-sign-out-alt"></i> ออกจากระบบ
+            </button>
+        </div>
     </div>
 
-    <div id="error-display" class="alert alert-danger d-none"></div>
-
-    <div class="row g-3 mb-4" id="dashboard-container">
-        </div>
+    <div class="row g-3 mb-4" id="dashboard-container"></div>
 
     <div class="card shadow-sm">
         <div class="card-header bg-white">
             <ul class="nav nav-tabs card-header-tabs">
-                <li class="nav-item"><a class="nav-link active" onclick="switchTab(1)">1. ด้านกายภาพ</a></li>
-                <li class="nav-item"><a class="nav-link" onclick="switchTab(2)">2. ด้านคุณภาพ</a></li>
-                <li class="nav-item"><a class="nav-link" onclick="switchTab(3)">3. ด้านผลลัพธ์</a></li>
+                <li class="nav-item"><a class="nav-link active" onclick="ui.switchTab(1)">1. ด้านกายภาพ</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="ui.switchTab(2)">2. ด้านคุณภาพ</a></li>
+                <li class="nav-item"><a class="nav-link" onclick="ui.switchTab(3)">3. ด้านผลลัพธ์</a></li>
             </ul>
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table align-middle mb-0">
+                <table class="table align-middle mb-0 table-hover">
                     <thead class="table-light">
                         <tr>
                             <th class="ps-3" style="width:10%">รหัส</th>
@@ -49,198 +70,304 @@
                             <th class="text-center" style="width:20%">สถานะ</th>
                         </tr>
                     </thead>
-                    <tbody id="table-body">
-                        <tr><td colspan="4" class="text-center py-5">กำลังโหลดข้อมูล...</td></tr>
-                    </tbody>
+                    <tbody id="table-body"></tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    // ประกาศตัวแปร Global
-    var currentTab = 1;
-    var rawData = [];
+<div class="modal fade" id="loginModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Admin Login</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="email" id="admin-email" class="form-control mb-2" placeholder="Email">
+                <input type="password" id="admin-pass" class="form-control mb-3" placeholder="Password">
+                <button class="btn btn-primary w-100" onclick="window.doLogin()">เข้าสู่ระบบ</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-    // ฟังก์ชันเริ่มต้น (ทำงานทันที)
-    (function initSystem() {
-        try {
-            // 1. สร้างข้อมูล (Data Generation)
-            rawData = [
-                // --- หมวด 1 ---
-                { id: "1.1", cat: 1, txt: "บริการนอกเวลา/พักเที่ยง", role: "ทุกฝ่าย", ok: true },
-                { id: "1.2", cat: 1, txt: "ระบบขนส่งเข้าถึงง่าย", role: "ทุกฝ่าย", ok: true },
-                { id: "1.3", cat: 1, txt: "ป้ายบอกทิศทางชัดเจน", role: "ทุกฝ่าย", ok: true },
-                { id: "1.4", cat: 1, txt: "ผังการไหลเวียนผู้ใช้บริการ", role: "ทุกฝ่าย", ok: true },
-                { id: "1.5", cat: 1, txt: "ป้ายชื่อผู้รับผิดชอบ", role: "ทุกฝ่าย", ok: true },
-                { id: "1.6", cat: 1, txt: "เคาน์เตอร์เหมาะสม", role: "ทุกฝ่าย", ok: true },
-                { id: "1.7", cat: 1, txt: "แสงสว่าง/ความปลอดภัย", role: "ทุกฝ่าย", ok: true },
-                { id: "1.8", cat: 1, txt: "สิ่งอำนวยความสะดวก", role: "ทุกฝ่าย", ok: true },
-                { id: "1.9", cat: 1, txt: "ห้องน้ำสะอาด", role: "ทุกฝ่าย", ok: true },
-                { id: "1.10", cat: 1, txt: "ระบบคิวเป็นธรรม", role: "ทุกฝ่าย", ok: true },
-                { id: "1.11", cat: 1, txt: "จุดคัดกรอง", role: "ทุกฝ่าย", ok: true },
-                { id: "1.12", cat: 1, txt: "ผังขั้นตอนและระยะเวลา", role: "ทุกฝ่าย", ok: true },
-                { id: "1.13", cat: 1, txt: "จุดประเมินความพึงพอใจ", role: "ทุกฝ่าย", ok: true },
-                { id: "1.14", cat: 1, txt: "พื้นที่ปลอดบุหรี่", role: "ทุกฝ่าย", ok: true },
-                { id: "1.15", cat: 1, txt: "ที่จอดรถ/สิ่งอำนวยความสะดวกผู้พิการ", role: "ทุกฝ่าย", ok: true },
-                
-                // --- หมวด 2 (คุณภาพ) ---
-		 { id: "1.1", cat: 2, txt: "มีการจัดการภูมิทัศน์ให้เอื้ออำนวยต่อการพักผ่อนหย่อนใจของประชาชน", role: "ฝ่ายอำนวยการ", ok: true },
-		{ id: "1.2", cat: 2, txt: "มีการจัดการขยะ", role: "ฝ่ายอำนวยการ", ok: true },
-		{ id: "1.3", cat: 2, txt: "มีการส่งเสริมการใช้พลังงานสีเขียวหรือพลังงานทดแทน", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.1", cat: 2, txt: "มีการสำรวจ เพื่อให้ทราบความต้องการและปัญหาการให้บริการ", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.2", cat: 2, txt: "มีการวิเคราะห์ผลการสำรวจและนำไปออกแบบ ปรับปรุง", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.3", cat: 2, txt: "มีงานบริการ ณ ศูนย์ราชการสะดวกครอบคลุม", role: "กลุ่มงานฯ ฝ่ายอำนวยการ", ok: false },
-                { id: "2.4", cat: 2, txt: "มีการจัดทำคู่มือการปฏิบัติงานสำหรับเจ้าหน้าที่ครอบคุม", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.5", cat: 2, txt: "มีระบบการติดตามสถานะผู้รับบริการ", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.6", cat: 2, txt: "มีระบบและกระบวนการบริการประชาชนแบบอิเล็กทรอนิกส์", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "2.7", cat: 2, txt: "มีระบบรองรับการบริการไร้รอยต่อ", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "2.8", cat: 2, txt: "มีการนำผลจากการติดตามงานมาปรับปรุง", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "2.9", cat: 2, txt: "มีกลไกการรับฟังและตอบสนองข้อร้องเรียน ข้อคิดเห็น", role: "กลุ่มงานฯ", ok: true },
-                { id: "2.10", cat: 2, txt: "กรณีเกิดข้อร้องเรียนการของหน่วยงานข้อร้องเรียน", role: "กลุ่มงานฯ", ok: true },
-                { id: "2.11", cat: 2, txt: "มีการพัฒนาเพิ่มช่องทางการให้บริการการให้คำปรึษา", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.12", cat: 2, txt: "มีการจัดทำแผนการติดตามผลการดำเนินการของศูนย์ราชการสะดวก", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "2.13", cat: 2, txt: " มีระบบการติดตามปัญหาที่เกิดจากการให้บริการที่ชัดเจน", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.14", cat: 2, txt: "มีการแลกเปลี่ยนเรียนรู้เกี่ยวกับปัญหาการปฏิบัติงาน", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.15", cat: 2, txt: "การมีบูรณาการการทำงานระหว่างหน่วยงานที่เกี่ยวข้อง", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "2.16", cat: 2, txt: "มีการปรับปรุง/พัฒนาและกำหนดผู้รับผิดชอบระบบ call center", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "2.17", cat: 2, txt: "มีแผนการบริหารความต่อเนื่องในหารให้บริการกรณีเกิดภาวะฉุกเฉิน", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "2.18", cat: 2, txt: "มีการทบทวนแผนการบริหารความต่อเนื่องของหน่วยงาน", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "3.1", cat: 2, txt: "มีการวิเคราะห์กำลังคนเพื่อจัดสรรบุคลากรให้เหมาะสม", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "3.2", cat: 2, txt: "มีการสร้างสิ่งจุงใจแก่บุคลากร", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "3.3", cat: 2, txt: "มีการเพิ่มศักยภาพและทักษะในการปฏิบัติที่จำเป็นและทันสมัย", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "3.4", cat: 2, txt: "เจ้าหน้าที่มีทักษะในการให้บริการ", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "3.5", cat: 2, txt: "เจ้าหน้าที่สามารถปฏิบัติงานได้ตามมาตรฐานที่กำหนด", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "4.1", cat: 2, txt: "มีระบบจัดเก็บข้อมูลและระบบวิเคราะห์ข้อมูลครอบคุม ถูกต้อง", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "4.2", cat: 2, txt: "มีแผนหรือระบบการจัดการป้องกันความเสี่ยงด้านเทคโนโลยี", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "4.3", cat: 2, txt: "นำนวัตกรรม/เทคโนโลยีมาประดิษฐ์", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "4.4", cat: 2, txt: "มีการเก็บข้อมูลผู้ใช้บริการแบบเรียลไทม์", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "4.5", cat: 2, txt: "มีเจ้าหน้าที่ทางเทคนิคหรือเจ้าหน้าที่ที่ได้รับมอบหมายให้ดูแลระบบ", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "5.1", cat: 2, txt: "เปิดโอกาสให้ผู้รับบริการมีส่วนร่วมในการออกแบบและปรับปรุงบริการ", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "5.2", cat: 2, txt: "มีการบริการเชิงรุก หรือการออกหน่วยเคลื่อนที่", role: "กลุ่มงานฯ", ok: true },
-                { id: "5.3", cat: 2, txt: "ขับเคลื่อนบริการด้วยนวัตกรรมและเทคโนโลยี", role: "ฝ่ายทะเบียน", ok: true },
-                { id: "5.4", cat: 2, txt: "ความเป็นต้นแบบ", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "5.5", cat: 2, txt: "มีระบบในการป้องกันการเกิดปัญหาเพื่อไม่ให้ลุกลาม", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "5.6", cat: 2, txt: "การแก้ไขปัญหาเพื่อให้เข้าถึงบริการอย่างเท่าเทียม", role: "ฝ่ายอำนวยการ", ok: false },
-                { id: "5.7", cat: 2, txt: "การบูรณาการการทำงานร่วมกับหน่วยงานอื่น", role: "ฝ่ายทะเบียน", ok: false },
-                { id: "5.8", cat: 2, txt: "การติดต่อหน่วยงานและการตรวจสอบข้อมูลของผู้รับบริการ", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "5.9", cat: 2, txt: "องค์ความรู้ของบุคลากรและการสื่อสารชัดเจน", role: "กลุ่มงานฯ", ok: true },
-                { id: "5.10", cat: 2, txt: "การพัฒนาระบบดิจิทัลในงานบริการที่สำคัญ", role: "ฝ่ายทะเบียน", ok: false },
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-                // --- หมวด 3 ---
-                { id: "O1", cat: 3, txt: "ความพึงพอใจของประชาชนในการรับบริการ", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "O2", cat: 3, txt: "ความสะดวกในการติดต่อราชการ", role: "ฝ่ายอำนวยการ", ok: true },
-                { id: "O3", cat: 3, txt: "การนำเทคโนโลยีมาช่วยในการให้บริการประชาชน", role: "ฝ่ายทะเบียน", ok: true }
-            ];
+    const firebaseConfig = {
+        apiKey: "AIzaSyD7vC7rbZzaLXyqTDG9NY4ClGky-ORRl2c",
+        authDomain: "phuket-land-tracker.firebaseapp.com",
+        databaseURL: "https://phuket-land-tracker-default-rtdb.firebaseio.com",
+        projectId: "phuket-land-tracker",
+        storageBucket: "phuket-land-tracker.firebasestorage.app",
+        messagingSenderId: "687812004402",
+        appId: "1:687812004402:web:9d884fbdc7dbc821d7ca2b",
+        measurementId: "G-G9TJS4QYV5"
+    };
 
-            // 2. สั่งวาดหน้าจอทันที
-            renderAll();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const auth = getAuth(app);
+    const dbRef = ref(db, 'gecc_data_full_v1'); 
 
-        } catch (e) {
-            // กรณี Error ให้แสดงข้อความสีแดงบนหน้าจอ
-            document.getElementById('error-display').classList.remove('d-none');
-            document.getElementById('error-display').innerHTML = "เกิดข้อผิดพลาด: " + e.message;
-        }
-    })();
+    window.appData = [];
+    window.currentTab = 1;
+    window.currentUser = null; // เก็บสถานะว่า Login หรือยัง
 
-    // ฟังก์ชันวาดกราฟและตาราง
-    function renderAll() {
-        renderDashboard();
-        renderTable();
-    }
-
-    function switchTab(catId) {
-        currentTab = catId;
-        // จัดการ class active ของ tab
-        var tabs = document.querySelectorAll('.nav-link');
-        tabs.forEach(t => t.classList.remove('active'));
-        tabs[catId-1].classList.add('active');
-        
-        renderTable();
-    }
-
-    function toggleStatus(id) {
-        var item = rawData.find(x => x.id === id);
-        if(item) {
-            item.ok = !item.ok;
-            renderAll();
-        }
-    }
-
-    function renderDashboard() {
-        var stats = {
-            1: { name: "ด้านกายภาพ", icon: "fa-building", total: 0, done: 0 },
-            2: { name: "ด้านคุณภาพ และเงื่อนไขพิเศษ", icon: "fa-star", total: 0, done: 0 },
-            3: { name: "ด้านผลลัพธ์", icon: "fa-chart-pie", total: 0, done: 0 }
-        };
-
-        // คำนวณยอด
-        rawData.forEach(d => {
-            if(stats[d.cat]) {
-                stats[d.cat].total++;
-                if(d.ok) stats[d.cat].done++;
-            }
-        });
-
-        // สร้าง HTML
-        var html = "";
-        for(var i=1; i<=3; i++) {
-            var s = stats[i];
-            var percent = s.total ? Math.round((s.done/s.total)*100) : 0;
-            var color = (percent === 100) ? "success" : "danger";
-            
-            // กรณีหมวด 2 ถ้าไม่ 100% ให้แดง
-            if(i === 2 && percent < 100) color = "danger";
-            else if(percent === 100) color = "success";
-
-            html += `
-                <div class="col-md-4">
-                    <div class="card card-dashboard p-3 text-center border-${color}" style="border-top: 5px solid;">
-                        <h5 class="text-secondary">${s.name}</h5>
-                        <h2 class="display-6 fw-bold text-${color}">${percent}%</h2>
-                        <small class="text-muted">เสร็จสิ้น ${s.done} / ${s.total}</small>
-                    </div>
-                </div>
-            `;
-        }
-        document.getElementById('dashboard-container').innerHTML = html;
-    }
-
-    function renderTable() {
-        var tbody = document.getElementById('table-body');
-        var items = rawData.filter(d => d.cat === currentTab);
-        
-        var html = "";
-        if(items.length === 0) {
-            html = "<tr><td colspan='4' class='text-center'>ไม่พบข้อมูล</td></tr>";
+    // --- Authentication Logic ---
+    onAuthStateChanged(auth, (user) => {
+        window.currentUser = user;
+        if (user) {
+            document.body.classList.remove('logged-out');
+            document.body.classList.add('logged-in');
         } else {
-            items.forEach(d => {
-                var btnClass = d.ok ? "btn-success" : "btn-outline-danger";
-                var icon = d.ok ? "fa-check" : "fa-times";
-                var statusText = d.ok ? "เสร็จสิ้น" : "ไม่เสร็จ";
-                var bgRow = d.ok ? "" : "style='background-color: #fff5f5;'";
-
-                html += `
-                    <tr ${bgRow}>
-                        <td class="ps-3 fw-bold text-secondary">${d.id}</td>
-                        <td>${d.txt}</td>
-                        <td><span class="badge bg-light text-dark border">${d.role}</span></td>
-                        <td class="text-center">
-                            <button class="btn ${btnClass} btn-sm status-badge" onclick="toggleStatus('${d.id}')">
-                                <i class="fas ${icon} me-1"></i> ${statusText}
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
+            document.body.classList.remove('logged-in');
+            document.body.classList.add('logged-out');
         }
-        tbody.innerHTML = html;
-    }
+        ui.renderAll(); // วาดหน้าจอใหม่ทุกครั้งที่สถานะล็อกอินเปลี่ยน
+    });
+
+    window.doLogin = function() {
+        const email = document.getElementById('admin-email').value;
+        const pass = document.getElementById('admin-pass').value;
+        signInWithEmailAndPassword(auth, email, pass)
+            .then(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                modal.hide();
+                alert("เข้าสู่ระบบเรียบร้อย");
+            })
+            .catch((error) => {
+                alert("Login Failed: " + error.message);
+            });
+    };
+
+    window.doLogout = function() {
+        signOut(auth).then(() => {
+            alert("ออกจากระบบแล้ว");
+        });
+    };
+
+    // --- Default Data (Backup) ---
+    const defaultData = [
+         // --- หมวด 1 ---
+         { id: "1.1", cat: 1, txt: "บริการนอกเวลา/พักเที่ยง", role: "ทุกฝ่าย", ok: false },
+         { id: "1.2", cat: 1, txt: "ระบบขนส่งเข้าถึงง่าย", role: "ทุกฝ่าย", ok: false },
+         { id: "1.3", cat: 1, txt: "ป้ายบอกทิศทางชัดเจน", role: "ทุกฝ่าย", ok: false },
+         { id: "1.4", cat: 1, txt: "ผังการไหลเวียนผู้ใช้บริการ", role: "ทุกฝ่าย", ok: false },
+         { id: "1.5", cat: 1, txt: "ป้ายชื่อผู้รับผิดชอบ", role: "ทุกฝ่าย", ok: false },
+         { id: "1.6", cat: 1, txt: "เคาน์เตอร์เหมาะสม", role: "ทุกฝ่าย", ok: false },
+         { id: "1.7", cat: 1, txt: "แสงสว่าง/ความปลอดภัย", role: "ทุกฝ่าย", ok: false },
+         { id: "1.8", cat: 1, txt: "สิ่งอำนวยความสะดวก", role: "ทุกฝ่าย", ok: false },
+         { id: "1.9", cat: 1, txt: "ห้องน้ำสะอาด", role: "ทุกฝ่าย", ok: false },
+         { id: "1.10", cat: 1, txt: "ระบบคิวเป็นธรรม", role: "ทุกฝ่าย", ok: false },
+         { id: "1.11", cat: 1, txt: "จุดคัดกรอง", role: "ทุกฝ่าย", ok: false },
+         { id: "1.12", cat: 1, txt: "ผังขั้นตอนและระยะเวลา", role: "ทุกฝ่าย", ok: false },
+         { id: "1.13", cat: 1, txt: "จุดประเมินความพึงพอใจ", role: "ทุกฝ่าย", ok: false },
+         { id: "1.14", cat: 1, txt: "พื้นที่ปลอดบุหรี่", role: "ทุกฝ่าย", ok: false },
+         { id: "1.15", cat: 1, txt: "ที่จอดรถ/สิ่งอำนวยความสะดวกผู้พิการ", role: "ทุกฝ่าย", ok: false },
+         // --- หมวด 2 (ข้อความเต็ม) ---
+         { id: "1.1 (Q)", cat: 2, txt: "มีการจัดการภูมิทัศน์ให้เอื้ออำนวยต่อการพักผ่อนหย่อนใจของประชาชน", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "1.2 (Q)", cat: 2, txt: "มีการจัดการขยะ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "1.3 (Q)", cat: 2, txt: "มีการส่งเสริมการใช้พลังงานสีเขียวหรือพลังงานทดแทน", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.1", cat: 2, txt: "มีการสำรวจ เพื่อให้ทราบความต้องการและปัญหาการให้บริการ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.2", cat: 2, txt: "มีการวิเคราะห์ผลการสำรวจและนำไปออกแบบ ปรับปรุง", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.3", cat: 2, txt: "มีงานบริการ ณ ศูนย์ราชการสะดวกครอบคลุม", role: "กลุ่มงานฯ", ok: false },
+         { id: "2.4", cat: 2, txt: "มีการจัดทำคู่มือการปฏิบัติงานสำหรับเจ้าหน้าที่ครอบคุม", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.5", cat: 2, txt: "มีระบบการติดตามสถานะผู้รับบริการ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.6", cat: 2, txt: "มีระบบและกระบวนการบริการประชาชนแบบอิเล็กทรอนิกส์", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "2.7", cat: 2, txt: "มีระบบรองรับการบริการไร้รอยต่อ", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "2.8", cat: 2, txt: "มีการนำผลจากการติดตามงานมาปรับปรุง", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "2.9", cat: 2, txt: "มีกลไกการรับฟังและตอบสนองข้อร้องเรียน ข้อคิดเห็น", role: "กลุ่มงานฯ", ok: false },
+         { id: "2.10", cat: 2, txt: "กรณีเกิดข้อร้องเรียนการของหน่วยงานข้อร้องเรียน", role: "กลุ่มงานฯ", ok: false },
+         { id: "2.11", cat: 2, txt: "มีการพัฒนาเพิ่มช่องทางการให้บริการการให้คำปรึษา", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.12", cat: 2, txt: "มีการจัดทำแผนการติดตามผลการดำเนินการของศูนย์ราชการสะดวก", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.13", cat: 2, txt: "มีระบบการติดตามปัญหาที่เกิดจากการให้บริการที่ชัดเจน", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.14", cat: 2, txt: "มีการแลกเปลี่ยนเรียนรู้เกี่ยวกับปัญหาการปฏิบัติงาน", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.15", cat: 2, txt: "การมีบูรณาการการทำงานระหว่างหน่วยงานที่เกี่ยวข้อง", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "2.16", cat: 2, txt: "มีการปรับปรุง/พัฒนาและกำหนดผู้รับผิดชอบระบบ call center", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.17", cat: 2, txt: "มีแผนการบริหารความต่อเนื่องในหารให้บริการกรณีเกิดภาวะฉุกเฉิน", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "2.18", cat: 2, txt: "มีการทบทวนแผนการบริหารความต่อเนื่องของหน่วยงาน", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "3.1", cat: 2, txt: "มีการวิเคราะห์กำลังคนเพื่อจัดสรรบุคลากรให้เหมาะสม", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "3.2", cat: 2, txt: "มีการสร้างสิ่งจุงใจแก่บุคลากร", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "3.3", cat: 2, txt: "มีการเพิ่มศักยภาพและทักษะในการปฏิบัติที่จำเป็นและทันสมัย", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "3.4", cat: 2, txt: "เจ้าหน้าที่มีทักษะในการให้บริการ", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "3.5", cat: 2, txt: "เจ้าหน้าที่สามารถปฏิบัติงานได้ตามมาตรฐานที่กำหนด", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "4.1", cat: 2, txt: "มีระบบจัดเก็บข้อมูลและระบบวิเคราะห์ข้อมูลครอบคุม ถูกต้อง", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "4.2", cat: 2, txt: "มีแผนหรือระบบการจัดการป้องกันความเสี่ยงด้านเทคโนโลยี", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "4.3", cat: 2, txt: "นำนวัตกรรม/เทคโนโลยีมาประดิษฐ์", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "4.4", cat: 2, txt: "มีการเก็บข้อมูลผู้ใช้บริการแบบเรียลไทม์", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "4.5", cat: 2, txt: "มีเจ้าหน้าที่ทางเทคนิคหรือเจ้าหน้าที่ที่ได้รับมอบหมายให้ดูแลระบบ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "5.1", cat: 2, txt: "เปิดโอกาสให้ผู้รับบริการมีส่วนร่วมในการออกแบบและปรับปรุงบริการ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "5.2", cat: 2, txt: "มีการบริการเชิงรุก หรือการออกหน่วยเคลื่อนที่", role: "กลุ่มงานฯ", ok: false },
+         { id: "5.3", cat: 2, txt: "ขับเคลื่อนบริการด้วยนวัตกรรมและเทคโนโลยี", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "5.4", cat: 2, txt: "ความเป็นต้นแบบ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "5.5", cat: 2, txt: "มีระบบในการป้องกันการเกิดปัญหาเพื่อไม่ให้ลุกลาม", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "5.6", cat: 2, txt: "การแก้ไขปัญหาเพื่อให้เข้าถึงบริการอย่างเท่าเทียม", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "5.7", cat: 2, txt: "การบูรณาการการทำงานร่วมกับหน่วยงานอื่น", role: "ฝ่ายทะเบียน", ok: false },
+         { id: "5.8", cat: 2, txt: "การติดต่อหน่วยงานและการตรวจสอบข้อมูลของผู้รับบริการ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "5.9", cat: 2, txt: "องค์ความรู้ของบุคลากรและการสื่อสารชัดเจน", role: "กลุ่มงานฯ", ok: false },
+         { id: "5.10", cat: 2, txt: "การพัฒนาระบบดิจิทัลในงานบริการที่สำคัญ", role: "ฝ่ายทะเบียน", ok: false },
+         // --- หมวด 3 ---
+         { id: "O1", cat: 3, txt: "ความพึงพอใจของประชาชนในการรับบริการ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "O2", cat: 3, txt: "ความสะดวกในการติดต่อราชการ", role: "ฝ่ายอำนวยการ", ok: false },
+         { id: "O3", cat: 3, txt: "การนำเทคโนโลยีมาช่วยในการให้บริการประชาชน", role: "ฝ่ายทะเบียน", ok: false }
+    ];
+
+    onValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        document.getElementById('loading').style.display = 'none';
+        
+        if (data) {
+            window.appData = data;
+        } else {
+            window.appData = defaultData;
+            // set(dbRef, defaultData); // ปิดตรงนี้ไว้ก่อนถ้าไม่ได้ Login จะเขียนไม่ได้
+        }
+        ui.renderAll();
+    });
+
+    window.updateCloudStatus = function(id) {
+        if (!window.currentUser) {
+            alert("กรุณาเข้าสู่ระบบก่อนแก้ไขข้อมูล");
+            const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+            modal.show();
+            return;
+        }
+
+        const index = window.appData.findIndex(x => x.id === id);
+        if(index !== -1) {
+            window.appData[index].ok = !window.appData[index].ok;
+            const status = document.getElementById('save-status');
+            status.innerHTML = '<i class="fas fa-sync fa-spin"></i> กำลังบันทึก...';
+            status.classList.remove('text-success');
+            status.classList.add('text-warning');
+
+            const itemRef = ref(db, `gecc_data_full_v1/${index}/ok`);
+            set(itemRef, window.appData[index].ok)
+                .then(() => {
+                    console.log("Saved: " + id);
+                    const status = document.getElementById('save-status');
+                    status.innerHTML = '<i class="fas fa-check-circle"></i> ล่าสุด';
+                    status.classList.add('text-success');
+                    status.classList.remove('text-warning');
+                })
+                .catch((error) => {
+                    alert("บันทึกไม่ได้ (สิทธิ์ไม่เพียงพอ): " + error.message);
+                });
+        }
+    };
 </script>
 
+<script>
+    const ui = {
+        switchTab: function(catId) {
+            window.currentTab = catId;
+            document.querySelectorAll('.nav-link').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-link')[catId-1].classList.add('active');
+            this.renderTable();
+        },
+
+        renderAll: function() {
+            this.renderDashboard();
+            this.renderTable();
+        },
+
+        renderDashboard: function() {
+            var stats = {
+                1: { name: "ด้านกายภาพ", total: 0, done: 0 },
+                2: { name: "ด้านคุณภาพ", total: 0, done: 0 },
+                3: { name: "ด้านผลลัพธ์", total: 0, done: 0 }
+            };
+
+            window.appData.forEach(d => {
+                if(stats[d.cat]) {
+                    stats[d.cat].total++;
+                    if(d.ok) stats[d.cat].done++;
+                }
+            });
+
+            var html = "";
+            for(var i=1; i<=3; i++) {
+                var s = stats[i];
+                var percent = s.total ? Math.round((s.done/s.total)*100) : 0;
+                var color = (percent === 100) ? "success" : "danger";
+                if(i === 2 && percent < 100) color = "danger"; 
+                else if(percent === 100) color = "success";
+
+                html += `
+                    <div class="col-md-4">
+                        <div class="card card-dashboard p-3 text-center border-${color}" style="border-top: 5px solid;">
+                            <h5 class="text-secondary">${s.name}</h5>
+                            <h2 class="display-6 fw-bold text-${color}">${percent}%</h2>
+                            <div class="progress mb-2" style="height: 6px;">
+                              <div class="progress-bar bg-${color}" role="progressbar" style="width: ${percent}%"></div>
+                            </div>
+                            <small class="text-muted">เสร็จสิ้น ${s.done} / ${s.total}</small>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById('dashboard-container').innerHTML = html;
+        },
+
+        renderTable: function() {
+            var tbody = document.getElementById('table-body');
+            var items = window.appData.filter(d => d.cat === window.currentTab);
+            
+            var html = "";
+            if(items.length === 0) {
+                html = "<tr><td colspan='4' class='text-center'>ไม่พบข้อมูล</td></tr>";
+            } else {
+                items.forEach(d => {
+                    // Logic: ถ้าไม่ได้ Login ให้แสดงแค่ Badge ธรรมดา (กดไม่ได้)
+                    // ถ้า Login แล้ว ให้แสดงปุ่มกดได้
+                    
+                    var statusText = d.ok ? "เรียบร้อย" : "กำลังดำเนินการ";
+                    var bgRow = d.ok ? "style='background-color: #f8fff9;'" : "";
+                    var textClass = d.ok ? "text-success fw-bold" : "text-dark";
+                    
+                    var actionButton = "";
+                    if (window.currentUser) {
+                        // Admin Mode: ปุ่มกดได้
+                        var btnClass = d.ok ? "btn-success" : "btn-outline-secondary";
+                        var icon = d.ok ? "fa-check" : "fa-clock";
+                        actionButton = `
+                            <button class="btn ${btnClass} btn-sm status-badge shadow-sm" onclick="window.updateCloudStatus('${d.id}')">
+                                <i class="fas ${icon} me-1"></i> ${statusText}
+                            </button>
+                        `;
+                    } else {
+                        // Guest Mode: ป้ายเฉยๆ
+                        var badgeClass = d.ok ? "bg-success" : "bg-secondary";
+                        var icon = d.ok ? "fa-check" : "fa-clock";
+                        actionButton = `
+                            <span class="badge ${badgeClass} status-badge py-2">
+                                <i class="fas ${icon} me-1"></i> ${statusText}
+                            </span>
+                        `;
+                    }
+
+                    html += `
+                        <tr ${bgRow}>
+                            <td class="ps-3 fw-bold text-secondary" style="white-space:nowrap;">${d.id}</td>
+                            <td class="${textClass} text-wrap-full">${d.txt}</td>
+                            <td><span class="badge bg-light text-dark border">${d.role}</span></td>
+                            <td class="text-center">
+                                ${actionButton}
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            tbody.innerHTML = html;
+        }
+    };
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
 </html>
-
-
