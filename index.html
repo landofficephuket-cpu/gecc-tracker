@@ -1,1 +1,732 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💰 Finance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050810;
+    --card: #0d1117;
+    --card2: #161b22;
+    --border: #1e2d45;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Sarabun', sans-serif;
+    --accent: #a78bfa;
+    --glow: rgba(167,139,250,0.08);
+    --income: #10d97e;
+    --expense: #ff1744;
+  }
+  body[data-user="choomphon"] { --accent: #38bdf8; --glow: rgba(56,189,248,0.1); }
+  body[data-user="nutcharee"]  { --accent: #4ade80; --glow: rgba(74,222,128,0.1); }
+ 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 24px;
+    transition: all 0.4s;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 10% 15%, var(--glow) 0%, transparent 55%),
+      radial-gradient(ellipse at 90% 85%, rgba(16,217,126,0.03) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    transition: all 0.4s;
+  }
+  .wrapper { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; }
+ 
+  header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+  }
+  .logo { font-family: var(--mono); font-size: 1.3rem; font-weight: 700; letter-spacing: -1px; }
+  .logo span { color: var(--accent); transition: color 0.4s; }
+  .header-right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+ 
+  .btn-primary {
+    padding: 8px 18px; border-radius: 10px; border: none;
+    background: var(--accent); color: #000; font-family: var(--sans);
+    font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .refresh-btn {
+    padding: 7px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-family: var(--mono);
+    font-size: 0.78rem; cursor: pointer; transition: all 0.2s;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .logout-btn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(255,23,68,0.3);
+    background: transparent; color: var(--expense); font-family: var(--mono);
+    font-size: 0.75rem; cursor: pointer; transition: all 0.2s;
+  }
+  .logout-btn:hover { background: rgba(255,23,68,0.1); }
+ 
+  /* Auth badge */
+  .auth-badge {
+    font-size: 0.72rem; font-family: var(--mono);
+    padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .auth-badge.logged { border-color: rgba(16,217,126,0.3); color: var(--income); background: rgba(16,217,126,0.08); }
+ 
+  .filter-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 12px 16px; flex: 1; min-width: 200px;
+  }
+  .filter-label { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); margin-right: 4px; white-space: nowrap; }
+  .btn {
+    padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-family: var(--sans);
+    font-size: 0.83rem; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .btn:hover { color: var(--text); border-color: var(--accent); }
+  .btn[data-uid="all"].active    { background: rgba(167,139,250,0.12); border-color: #a78bfa; color: #a78bfa; }
+  .btn[data-uid="6103766719"].active { background: rgba(56,189,248,0.12); border-color: #38bdf8; color: #38bdf8; }
+  .btn[data-uid="7764267378"].active { background: rgba(74,222,128,0.12); border-color: #4ade80; color: #4ade80; }
+  .btn[data-period].active { background: rgba(255,23,68,0.12); border-color: var(--expense); color: var(--expense); }
+  .date-input {
+    background: var(--card2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--mono); font-size: 0.75rem; padding: 5px 10px; outline: none;
+  }
+  .date-input:focus { border-color: var(--accent); }
+ 
+  .summary-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 20px; }
+  @media (max-width: 768px) { .summary-grid { grid-template-columns: repeat(2,1fr); } }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden;
+  }
+  .card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .card.income::after  { background: var(--income); }
+  .card.expense::after { background: var(--expense); }
+  .card.balance::after { background: var(--accent); transition: background 0.4s; }
+  .card.count::after   { background: var(--muted); }
+  .card-icon { font-size: 1.2rem; margin-bottom: 6px; }
+  .card-label { font-size: 0.7rem; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 4px; }
+  .card-value { font-family: var(--mono); font-size: 1.5rem; font-weight: 700; letter-spacing: -1px; line-height: 1.1; }
+  .card.income .card-value  { color: var(--income); }
+  .card.expense .card-value { color: var(--expense); }
+  .card.balance .card-value { color: var(--accent); transition: color 0.4s; }
+  .card-sub { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+ 
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+  @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+  .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+  .chart-title { font-size: 0.73rem; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 14px; }
+  .chart-wrap { position: relative; height: 200px; }
+ 
+  .table-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 20px; overflow-x: auto; }
+  .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .table-title { font-size: 0.73rem; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; }
+  .table-count { font-size: 0.7rem; color: var(--muted); background: var(--card2); padding: 3px 10px; border-radius: 10px; font-family: var(--mono); }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  th { text-align: left; font-size: 0.68rem; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 12px; font-size: 0.86rem; border-bottom: 1px solid rgba(30,45,69,0.4); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.015); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; }
+  .badge.income  { background: rgba(16,217,126,0.12); color: var(--income); border: 1px solid rgba(16,217,126,0.2); }
+  .badge.expense { background: rgba(255,23,68,0.12); color: var(--expense); border: 1px solid rgba(255,23,68,0.2); }
+  .amount-income  { color: var(--income); font-family: var(--mono); font-weight: 700; }
+  .amount-expense { color: var(--expense); font-family: var(--mono); font-weight: 700; }
+  .cat-badge { background: var(--card2); color: var(--muted); padding: 2px 8px; border-radius: 6px; font-size: 0.68rem; }
+  .user-chip { font-family: var(--mono); font-size: 0.68rem; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border); }
+  .user-chip.choomphon { color: #38bdf8; border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.08); }
+  .user-chip.nutcharee { color: #4ade80; border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.08); }
+  .edit-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); font-size: 0.75rem; padding: 3px 8px;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .note-cell { color: var(--muted); font-size: 0.82rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ 
+  /* Modals */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75); z-index: 100;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 18px; padding: 28px; width: 100%; max-width: 460px; position: relative;
+  }
+  .modal-title { font-family: var(--mono); font-size: 1rem; font-weight: 700; margin-bottom: 20px; }
+  .modal-close { position: absolute; top: 16px; right: 20px; background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; display: block; }
+  .form-input, .form-select {
+    width: 100%; background: var(--card2); border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text); font-family: var(--sans);
+    font-size: 0.95rem; padding: 10px 14px; outline: none; transition: border-color 0.2s;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); }
+  .form-select option { background: var(--card2); }
+  .type-toggle { display: flex; gap: 8px; }
+  .type-btn {
+    flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-family: var(--sans);
+    font-size: 0.9rem; cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .type-btn.income.active  { background: rgba(16,217,126,0.15); border-color: var(--income); color: var(--income); }
+  .type-btn.expense.active { background: rgba(255,23,68,0.15); border-color: var(--expense); color: var(--expense); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .submit-btn {
+    width: 100%; padding: 12px; border-radius: 12px; border: none;
+    background: var(--accent); color: #000; font-family: var(--sans);
+    font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 8px; transition: all 0.2s;
+  }
+  .submit-btn:hover { opacity: 0.85; }
+  .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+ 
+  /* Login modal specific */
+  #loginModal .modal-title { color: var(--accent); }
+  .login-error { color: var(--expense); font-size: 0.78rem; font-family: var(--mono); text-align: center; margin-top: 8px; min-height: 18px; }
+ 
+  .toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 24px;
+    font-family: var(--mono); font-size: 0.85rem;
+    z-index: 200; transition: transform 0.3s; white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--income); color: var(--income); }
+  .toast.error { border-color: var(--expense); color: var(--expense); }
+ 
+  .loading { display: flex; align-items: center; justify-content: center; height: 160px; color: var(--muted); font-family: var(--mono); font-size: 0.85rem; gap: 10px; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; color: var(--muted); padding: 40px; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <header>
+    <div class="logo">💰 <span>Finance</span>.db</div>
+    <div class="header-right">
+      <span id="lastUpdate" style="font-size:0.7rem;color:var(--muted);font-family:var(--mono)"></span>
+      <span class="auth-badge" id="authBadge">🔒 ดูอย่างเดียว</span>
+      <button class="refresh-btn" onclick="loadData()">⟳ Refresh</button>
+      <button class="btn-primary" onclick="requireAuth(openAddModal)">➕ เพิ่มรายการ</button>
+      <button id="logoutBtn" class="logout-btn" style="display:none" onclick="logout()">ออกจากระบบ</button>
+    </div>
+  </header>
+ 
+  <div class="filter-row">
+    <div class="filter-bar">
+      <span class="filter-label">👤 ดูของ:</span>
+      <button class="btn active" data-uid="all" onclick="selectUser('all')">🌐 ทุกคน</button>
+      <button class="btn" data-uid="6103766719" onclick="selectUser('6103766719')">🔵 ชุมพล</button>
+      <button class="btn" data-uid="7764267378" onclick="selectUser('7764267378')">🟢 นุชรีย์</button>
+    </div>
+    <div class="filter-bar">
+      <span class="filter-label">📅 ช่วงเวลา:</span>
+      <button class="btn active" data-period="all" onclick="selectPeriod('all')">ทั้งหมด</button>
+      <button class="btn" data-period="today" onclick="selectPeriod('today')">วันนี้</button>
+      <button class="btn" data-period="week" onclick="selectPeriod('week')">สัปดาห์นี้</button>
+      <button class="btn" data-period="month" onclick="selectPeriod('month')">เดือนนี้</button>
+      <button class="btn" data-period="custom" onclick="selectPeriod('custom')">กำหนดเอง</button>
+    </div>
+  </div>
+ 
+  <div id="customDateRow" style="display:none;margin-bottom:16px;">
+    <div class="filter-bar">
+      <span class="filter-label">📆 ตั้งแต่:</span>
+      <input type="date" id="dateFrom" class="date-input" onchange="renderDashboard()">
+      <span class="filter-label">ถึง:</span>
+      <input type="date" id="dateTo" class="date-input" onchange="renderDashboard()">
+    </div>
+  </div>
+ 
+  <div class="summary-grid">
+    <div class="card income">
+      <div class="card-icon">💰</div>
+      <div class="card-label">รายรับรวม</div>
+      <div class="card-value" id="totalIncome">—</div>
+      <div class="card-sub" id="incomeCount">0 รายการ</div>
+    </div>
+    <div class="card expense">
+      <div class="card-icon">💸</div>
+      <div class="card-label">รายจ่ายรวม</div>
+      <div class="card-value" id="totalExpense">—</div>
+      <div class="card-sub" id="expenseCount">0 รายการ</div>
+    </div>
+    <div class="card balance">
+      <div class="card-icon">📊</div>
+      <div class="card-label">คงเหลือ</div>
+      <div class="card-value" id="balance">—</div>
+      <div class="card-sub" id="balanceSub">รายรับ - รายจ่าย</div>
+    </div>
+    <div class="card count">
+      <div class="card-icon">📋</div>
+      <div class="card-label">รายการทั้งหมด</div>
+      <div class="card-value" id="totalCount">—</div>
+      <div class="card-sub" id="periodLabel">ช่วงที่เลือก</div>
+    </div>
+  </div>
+ 
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">🏷 รายจ่ายแยกหมวดหมู่</div>
+      <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="dailyChartTitle">📅 รายรับ-รายจ่ายรายวัน</div>
+      <div class="chart-wrap"><canvas id="dailyChart"></canvas></div>
+    </div>
+  </div>
+ 
+  <div class="table-card">
+    <div class="table-header">
+      <div class="table-title">📋 รายการ</div>
+      <div class="table-count" id="tableCount">0 รายการ</div>
+    </div>
+    <div id="tableContent">
+      <div class="loading"><div class="spinner"></div> กำลังโหลด...</div>
+    </div>
+  </div>
+</div>
+ 
+<!-- Login Modal -->
+<div class="modal-overlay" id="loginModalOverlay" onclick="if(event.target.id==='loginModalOverlay')closeLoginModal()">
+  <div class="modal" id="loginModal">
+    <div class="modal-title">🔐 เข้าสู่ระบบเพื่อแก้ไข</div>
+    <button class="modal-close" onclick="closeLoginModal()">✕</button>
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" id="loginUser" class="form-input" placeholder="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" id="loginPass" class="form-input" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="submit-btn" onclick="doLogin()">🔐 เข้าสู่ระบบ</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+ 
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModalOverlay" onclick="if(event.target.id==='addModalOverlay')closeAddModal()">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--income)">➕ เพิ่มรายการใหม่</div>
+    <button class="modal-close" onclick="closeAddModal()">✕</button>
+    <div class="form-group">
+      <label class="form-label">ประเภท</label>
+      <div class="type-toggle">
+        <button class="type-btn expense active" id="addTypeExpense" onclick="setAddType('expense')">💸 รายจ่าย</button>
+        <button class="type-btn income" id="addTypeIncome" onclick="setAddType('income')">💰 รายรับ</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">จำนวนเงิน (บาท)</label>
+        <input type="number" id="fAmount" class="form-input" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">วันที่</label>
+        <input type="date" id="fDate" class="form-input">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">หมวดหมู่</label>
+      <select id="fCategory" class="form-select">
+        <option value="อาหาร">🍜 อาหาร</option>
+        <option value="เดินทาง">🚗 เดินทาง</option>
+        <option value="ช้อปปิ้ง">🛒 ช้อปปิ้ง</option>
+        <option value="บิล">📄 บิล</option>
+        <option value="สุขภาพ">💊 สุขภาพ</option>
+        <option value="บันเทิง">🎮 บันเทิง</option>
+        <option value="เงินเดือน">💼 เงินเดือน</option>
+        <option value="อื่นๆ">📦 อื่นๆ</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">ผู้บันทึก</label>
+      <select id="fUser" class="form-select">
+        <option value="6103766719">🔵 ชุมพล</option>
+        <option value="7764267378">🟢 นุชรีย์</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">หมายเหตุ</label>
+      <input type="text" id="fNote" class="form-input" placeholder="เช่น ข้าวเย็น, ค่าน้ำมัน...">
+    </div>
+    <button class="submit-btn" id="addSubmitBtn" onclick="submitAdd()">✅ บันทึก</button>
+  </div>
+</div>
+ 
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModalOverlay" onclick="if(event.target.id==='editModalOverlay')closeEditModal()">
+  <div class="modal">
+    <div class="modal-title" style="color:var(--accent)">✏️ แก้ไขรายการ</div>
+    <button class="modal-close" onclick="closeEditModal()">✕</button>
+    <input type="hidden" id="editId">
+    <div class="form-group">
+      <label class="form-label">ประเภท</label>
+      <div class="type-toggle">
+        <button class="type-btn expense" id="editTypeExpense" onclick="setEditType('expense')">💸 รายจ่าย</button>
+        <button class="type-btn income" id="editTypeIncome" onclick="setEditType('income')">💰 รายรับ</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">หมวดหมู่</label>
+      <select id="eCategory" class="form-select">
+        <option value="อาหาร">🍜 อาหาร</option>
+        <option value="เดินทาง">🚗 เดินทาง</option>
+        <option value="ช้อปปิ้ง">🛒 ช้อปปิ้ง</option>
+        <option value="บิล">📄 บิล</option>
+        <option value="สุขภาพ">💊 สุขภาพ</option>
+        <option value="บันเทิง">🎮 บันเทิง</option>
+        <option value="เงินเดือน">💼 เงินเดือน</option>
+        <option value="อื่นๆ">📦 อื่นๆ</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">หมายเหตุ</label>
+      <input type="text" id="eNote" class="form-input" placeholder="หมายเหตุ...">
+    </div>
+    <button class="submit-btn" id="editSubmitBtn" onclick="submitEdit()">💾 บันทึกการแก้ไข</button>
+  </div>
+</div>
+ 
+<div class="toast" id="toast"></div>
+ 
+<script>
+// ===== AUTH =====
+const USERS = { 'suckseeds32': 'Sing2012@' };
+let isLoggedIn = sessionStorage.getItem('auth') === '1';
+let pendingAction = null;
+ 
+function updateAuthUI() {
+  const badge = document.getElementById('authBadge');
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (isLoggedIn) {
+    badge.textContent = '✅ เข้าสู่ระบบแล้ว';
+    badge.className = 'auth-badge logged';
+    logoutBtn.style.display = 'block';
+  } else {
+    badge.textContent = '🔒 ดูอย่างเดียว';
+    badge.className = 'auth-badge';
+    logoutBtn.style.display = 'none';
+  }
+}
+ 
+function requireAuth(action) {
+  if (isLoggedIn) {
+    action();
+  } else {
+    pendingAction = action;
+    document.getElementById('loginUser').value = '';
+    document.getElementById('loginPass').value = '';
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginModalOverlay').classList.add('open');
+  }
+}
+ 
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  if (USERS[u] && USERS[u] === p) {
+    isLoggedIn = true;
+    sessionStorage.setItem('auth', '1');
+    closeLoginModal();
+    updateAuthUI();
+    showToast('✅ เข้าสู่ระบบสำเร็จ', 'success');
+    if (pendingAction) { pendingAction(); pendingAction = null; }
+  } else {
+    document.getElementById('loginError').textContent = '❌ Username หรือ Password ไม่ถูกต้อง';
+    document.getElementById('loginPass').value = '';
+  }
+}
+ 
+function logout() {
+  isLoggedIn = false;
+  sessionStorage.removeItem('auth');
+  updateAuthUI();
+  showToast('ออกจากระบบแล้ว', 'success');
+}
+ 
+function closeLoginModal() {
+  document.getElementById('loginModalOverlay').classList.remove('open');
+  pendingAction = null;
+}
+ 
+updateAuthUI();
+ 
+// ===== SUPABASE =====
+const SUPABASE_URL = 'https://zeoelwydjzbueqjevfgp.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_vdQ9I8B0hTShDaQ1NbTYyQ_btN35-ZK';
+const USER_MAP = {
+  '6103766719': { name: 'ชุมพล', theme: 'choomphon' },
+  '7764267378': { name: 'นุชรีย์', theme: 'nutcharee' }
+};
+ 
+let allData = [], selectedUser = 'all', selectedPeriod = 'all';
+let addType = 'expense', editType = 'expense';
+let categoryChart = null, dailyChart = null;
+ 
+// ===== ADD =====
+function openAddModal() {
+  document.getElementById('fDate').value = new Date().toISOString().slice(0,10);
+  if (selectedUser !== 'all') document.getElementById('fUser').value = selectedUser;
+  document.getElementById('addModalOverlay').classList.add('open');
+}
+function closeAddModal() {
+  document.getElementById('addModalOverlay').classList.remove('open');
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fNote').value = '';
+}
+function setAddType(t) {
+  addType = t;
+  document.getElementById('addTypeExpense').classList.toggle('active', t==='expense');
+  document.getElementById('addTypeIncome').classList.toggle('active', t==='income');
+  document.getElementById('fCategory').value = t==='income' ? 'เงินเดือน' : 'อาหาร';
+}
+async function submitAdd() {
+  const amount = parseFloat(document.getElementById('fAmount').value);
+  const date = document.getElementById('fDate').value;
+  const category = document.getElementById('fCategory').value;
+  const user_id = document.getElementById('fUser').value;
+  const note = document.getElementById('fNote').value || category;
+  if (!amount || amount <= 0) { showToast('❌ กรุณาใส่จำนวนเงิน','error'); return; }
+  const btn = document.getElementById('addSubmitBtn');
+  btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
+  const d = new Date(date);
+  const thaiDate = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()+543}`;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/expenses`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ date: thaiDate, type: addType==='income'?'รายรับ':'รายจ่าย', amount, category, note, user_id })
+    });
+    if (res.ok||res.status===201) { showToast(`✅ บันทึกแล้ว! ฿${amount.toLocaleString('th-TH')}`,'success'); closeAddModal(); await loadData(); }
+    else throw new Error();
+  } catch(e) { showToast('❌ บันทึกไม่ได้','error'); }
+  btn.disabled = false; btn.textContent = '✅ บันทึก';
+}
+ 
+// ===== EDIT =====
+function openEditModal(r) {
+  document.getElementById('editId').value = r.id;
+  document.getElementById('eCategory').value = r.category || 'อื่นๆ';
+  document.getElementById('eNote').value = r.note || '';
+  setEditType(r.type==='รายรับ'?'income':'expense');
+  document.getElementById('editModalOverlay').classList.add('open');
+}
+function closeEditModal() { document.getElementById('editModalOverlay').classList.remove('open'); }
+function setEditType(t) {
+  editType = t;
+  document.getElementById('editTypeExpense').classList.toggle('active', t==='expense');
+  document.getElementById('editTypeIncome').classList.toggle('active', t==='income');
+}
+async function submitEdit() {
+  const id = document.getElementById('editId').value;
+  const category = document.getElementById('eCategory').value;
+  const note = document.getElementById('eNote').value;
+  const type = editType==='income'?'รายรับ':'รายจ่าย';
+  const btn = document.getElementById('editSubmitBtn');
+  btn.disabled = true; btn.textContent = '⏳ กำลังบันทึก...';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/expenses?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ type, category, note })
+    });
+    if (res.ok) { showToast('✅ แก้ไขแล้ว!','success'); closeEditModal(); await loadData(); }
+    else throw new Error();
+  } catch(e) { showToast('❌ แก้ไขไม่ได้','error'); }
+  btn.disabled = false; btn.textContent = '💾 บันทึกการแก้ไข';
+}
+ 
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+ 
+// ===== DATA =====
+async function loadData() {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/expenses?select=*&order=created_at.desc&limit=1000`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    allData = await res.json();
+    renderDashboard();
+    document.getElementById('lastUpdate').textContent = 'อัพเดต ' + new Date().toLocaleTimeString('th-TH');
+  } catch(e) {
+    document.getElementById('tableContent').innerHTML = '<div class="empty">❌ โหลดข้อมูลไม่ได้</div>';
+  }
+}
+ 
+function selectUser(uid) {
+  selectedUser = uid;
+  document.querySelectorAll('.btn[data-uid]').forEach(b => b.classList.toggle('active', b.dataset.uid===uid));
+  const body = document.body;
+  if (uid==='6103766719') body.setAttribute('data-user','choomphon');
+  else if (uid==='7764267378') body.setAttribute('data-user','nutcharee');
+  else body.removeAttribute('data-user');
+  renderDashboard();
+}
+ 
+function selectPeriod(period) {
+  selectedPeriod = period;
+  document.querySelectorAll('.btn[data-period]').forEach(b => b.classList.toggle('active', b.dataset.period===period));
+  document.getElementById('customDateRow').style.display = period==='custom'?'block':'none';
+  if (period==='custom') {
+    const today = new Date().toISOString().slice(0,10);
+    if (!document.getElementById('dateTo').value) document.getElementById('dateTo').value = today;
+    if (!document.getElementById('dateFrom').value) {
+      const d = new Date(); d.setDate(d.getDate()-30);
+      document.getElementById('dateFrom').value = d.toISOString().slice(0,10);
+    }
+  }
+  renderDashboard();
+}
+ 
+function parseThaiDate(s) {
+  if (!s) return null;
+  const p = s.split('/');
+  if (p.length===3) { let y=parseInt(p[2]); if(y>2500) y-=543; return new Date(y,parseInt(p[1])-1,parseInt(p[0])); }
+  return new Date(s);
+}
+ 
+function getFilteredByPeriod(data) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return data.filter(r => {
+    const d = parseThaiDate(r.date) || new Date(r.created_at);
+    if (!d||isNaN(d)) return selectedPeriod==='all';
+    switch(selectedPeriod) {
+      case 'all': return true;
+      case 'today': return d>=today;
+      case 'week': { const w=new Date(today); w.setDate(today.getDate()-today.getDay()); return d>=w; }
+      case 'month': return d>=new Date(now.getFullYear(),now.getMonth(),1);
+      case 'custom': {
+        const from=document.getElementById('dateFrom').value, to=document.getElementById('dateTo').value;
+        if(!from||!to) return true;
+        const toDate=new Date(to); toDate.setDate(toDate.getDate()+1);
+        return d>=new Date(from)&&d<toDate;
+      }
+      default: return true;
+    }
+  });
+}
+ 
+function getFiltered() {
+  let data = allData;
+  if (selectedUser!=='all') data = data.filter(r=>String(r.user_id)===selectedUser);
+  return getFilteredByPeriod(data);
+}
+ 
+function renderDashboard() {
+  const data = getFiltered();
+  renderSummary(data); renderCategoryChart(data); renderDailyChart(data); renderTable(data);
+}
+ 
+function fmt(n) { return Number(n).toLocaleString('th-TH',{minimumFractionDigits:0}); }
+function getAccent() {
+  if(selectedUser==='6103766719') return '#38bdf8';
+  if(selectedUser==='7764267378') return '#4ade80';
+  return '#a78bfa';
+}
+ 
+function renderSummary(data) {
+  const income=data.filter(r=>r.type==='รายรับ'), expense=data.filter(r=>r.type==='รายจ่าย');
+  const totalIn=income.reduce((s,r)=>s+Number(r.amount),0), totalEx=expense.reduce((s,r)=>s+Number(r.amount),0);
+  const bal=totalIn-totalEx;
+  document.getElementById('totalIncome').textContent=`฿${fmt(totalIn)}`;
+  document.getElementById('totalExpense').textContent=`฿${fmt(totalEx)}`;
+  document.getElementById('balance').textContent=`฿${fmt(Math.abs(bal))}`;
+  document.getElementById('totalCount').textContent=data.length;
+  document.getElementById('incomeCount').textContent=`${income.length} รายการ`;
+  document.getElementById('expenseCount').textContent=`${expense.length} รายการ`;
+  document.getElementById('balanceSub').textContent=bal>=0?'📈 เป็นบวก':'📉 เป็นลบ';
+  document.getElementById('periodLabel').textContent={all:'ทั้งหมด',today:'วันนี้',week:'สัปดาห์นี้',month:'เดือนนี้',custom:'กำหนดเอง'}[selectedPeriod];
+  document.getElementById('balance').style.color=bal<0?'var(--expense)':'';
+}
+ 
+function renderCategoryChart(data) {
+  const catMap={};
+  data.filter(r=>r.type==='รายจ่าย').forEach(r=>{catMap[r.category]=(catMap[r.category]||0)+Number(r.amount);});
+  const labels=Object.keys(catMap),values=Object.values(catMap);
+  const reds=['#ff1744','#ff4d6d','#ff6b6b','#ff8a80','#c62828','#e53935','#ef9a9a','#b71c1c'];
+  if(categoryChart) categoryChart.destroy();
+  const ctx=document.getElementById('categoryChart').getContext('2d');
+  if(!labels.length){ctx.clearRect(0,0,400,200);return;}
+  categoryChart=new Chart(ctx,{
+    type:'doughnut',
+    data:{labels,datasets:[{data:values,backgroundColor:reds.slice(0,labels.length),borderWidth:2,borderColor:'#0d1117'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#94a3b8',font:{family:'Sarabun',size:11},boxWidth:12,padding:8}},tooltip:{callbacks:{label:c=>` ฿${fmt(c.raw)}`}}}}
+  });
+}
+ 
+function renderDailyChart(data) {
+  const isAll=selectedPeriod==='all';
+  const dayMap={};
+  data.forEach(r=>{
+    const d=parseThaiDate(r.date)||new Date(r.created_at);
+    const key=isAll?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`:(r.date||new Date(r.created_at).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}));
+    if(!dayMap[key]) dayMap[key]={income:0,expense:0};
+    if(r.type==='รายรับ') dayMap[key].income+=Number(r.amount);
+    if(r.type==='รายจ่าย') dayMap[key].expense+=Number(r.amount);
+  });
+  const keys=Object.keys(dayMap).sort().slice(-20);
+  const accent=getAccent();
+  document.getElementById('dailyChartTitle').textContent=isAll?'📅 รายรับ-รายจ่ายรายเดือน':'📅 รายรับ-รายจ่ายรายวัน';
+  if(dailyChart) dailyChart.destroy();
+  const ctx=document.getElementById('dailyChart').getContext('2d');
+  if(!keys.length){ctx.clearRect(0,0,400,200);return;}
+  dailyChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:keys,datasets:[{label:'รายรับ',data:keys.map(k=>dayMap[k].income),backgroundColor:accent+'cc',borderRadius:5},{label:'รายจ่าย',data:keys.map(k=>dayMap[k].expense),backgroundColor:'#ff1744cc',borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8',font:{family:'Sarabun',size:11},boxWidth:12}},tooltip:{callbacks:{label:c=>` ฿${fmt(c.raw)}`}}},scales:{x:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'rgba(30,45,69,0.4)'}},y:{ticks:{color:'#64748b',font:{size:10},callback:v=>`฿${fmt(v)}`},grid:{color:'rgba(30,45,69,0.4)'}}}}
+  });
+}
+ 
+function renderTable(data) {
+  document.getElementById('tableCount').textContent=`${data.length} รายการ`;
+  if(!data.length){document.getElementById('tableContent').innerHTML='<div class="empty">ยังไม่มีรายการในช่วงนี้</div>';return;}
+  const rows=data.slice(0,50).map(r=>{
+    const isIncome=r.type==='รายรับ';
+    const uid=String(r.user_id), u=USER_MAP[uid];
+    const chip=u?`<span class="user-chip ${u.theme}">${u.name}</span>`:`<span class="user-chip">${uid.slice(-4)}</span>`;
+    const editBtn = `<button class="edit-btn" onclick='requireAuth(()=>openEditModal(${JSON.stringify(r)}))'>✏️ แก้ไข</button>`;
+    return `<tr>
+      <td style="color:var(--muted);font-family:var(--mono);font-size:0.73rem;white-space:nowrap">${r.date||'-'}</td>
+      <td><span class="badge ${isIncome?'income':'expense'}">${r.type}</span></td>
+      <td class="${isIncome?'amount-income':'amount-expense'}">฿${fmt(r.amount)}</td>
+      <td><span class="cat-badge">${r.category||'-'}</span></td>
+      <td class="note-cell" title="${r.note||''}">${r.note||'-'}</td>
+      <td>${chip}</td>
+      <td>${editBtn}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tableContent').innerHTML=`
+    <table>
+      <thead><tr><th>วันที่</th><th>ประเภท</th><th>จำนวน</th><th>หมวดหมู่</th><th>หมายเหตุ</th><th>ผู้ใช้</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+ 
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
 
